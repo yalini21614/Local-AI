@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local AI Search & Nearby Assistant</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: #f1f5f9; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+    .container { max-width: 720px; width: 100%; }
+    h1 { color: #dc2626; text-align: center; margin-bottom: 6px; }
+    .subtitle { text-align: center; color: #64748b; margin-bottom: 20px; font-size: 15px; }
+    .search-box { background: white; padding: 18px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: flex; gap: 10px; flex-wrap: wrap; }
+    input[type="text"] { flex: 1; min-width: 200px; padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; }
+    button { padding: 12px 20px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn-loc { background: #0284c7; color: white; }
+    .btn-loc:hover { background: #0369a1; }
+    .btn-search { background: #dc2626; color: white; }
+    .btn-search:hover { background: #b91c1c; }
+    #status { margin-top: 12px; color: #475569; font-size: 14px; text-align: center; font-weight: 500; }
+    
+    .gmaps-banner {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+      padding: 16px 20px;
+      border-radius: 12px;
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 8px rgba(37,99,235,0.25);
+    }
+    .gmaps-banner h4 { margin: 0 0 4px 0; font-size: 16px; }
+    .gmaps-banner p { margin: 0; font-size: 13px; opacity: 0.9; }
+    .gmaps-banner-btn {
+      background: #ffffff;
+      color: #1d4ed8;
+      padding: 10px 18px;
+      text-decoration: none;
+      font-weight: bold;
+      border-radius: 8px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    .gmaps-banner-btn:hover { background: #f8fafc; }
+
+    .results-list { margin-top: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .card { background: white; padding: 16px; border-radius: 10px; border-left: 5px solid #dc2626; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .card h3 { margin: 0 0 6px 0; color: #0f172a; font-size: 17px; }
+    .card p { margin: 4px 0; color: #64748b; font-size: 13px; word-break: break-word; }
+    .distance-badge { display: inline-block; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-bottom: 8px; }
+    .maps-btn { display: inline-block; margin-top: 8px; padding: 8px 14px; background: #16a34a; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: bold; }
+    .maps-btn:hover { background: #15803d; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🍲 Local Search & Place Assistant</h1>
+  <div class="subtitle">Find the best Biryani & nearby spots with instant Google Maps directions</div>
+  
+  <div class="search-box">
+    <input type="text" id="query" value="biryani" placeholder="Search (e.g. biryani, hotel, tea stall)">
+    <button class="btn-loc" id="locBtn" onclick="getLocation()">📍 Detect My Location</button>
+    <button class="btn-search" onclick="searchPlaces()">🔍 Search</button>
+  </div>
+
+  <div id="status">Click <b>"Detect My Location"</b> or hit <b>"Search"</b></div>
+
+  <div id="gmaps-callout" style="display:none;" class="gmaps-banner">
+    <div>
+      <h4 id="gmaps-banner-title">Google Maps Live Results</h4>
+      <p id="gmaps-banner-desc">View all verified live spots & customer ratings in Google Maps</p>
+    </div>
+    <a id="gmaps-banner-link" href="#" target="_blank" class="gmaps-banner-btn">📍 Open Google Maps</a>
+  </div>
+
+  <div class="results-list" id="results"></div>
+</div>
+
+<script>
+let userLat = 9.9029; // Madurai coordinates by default
+let userLon = 78.0390;
+
+function getLocation() {
+  const status = document.getElementById('status');
+  if (navigator.geolocation) {
+    status.innerHTML = "⏳ Detecting your GPS location...";
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
+        status.innerHTML = `✅ Location detected: <b>${userLat.toFixed(4)}, ${userLon.toFixed(4)}</b>`;
+        searchPlaces(); // automatically search once location is found
+      },
+      (err) => {
+        status.innerHTML = "⚠️ Location permission denied. Using detected region.";
+        searchPlaces();
+      },
+      { timeout: 8000 }
+    );
+  } else {
+    status.innerText = "Geolocation not supported.";
+  }
+}
+
+async function searchPlaces() {
+  const q = document.getElementById('query').value.trim();
+  const status = document.getElementById('status');
+  const resultsDiv = document.getElementById('results');
+  const banner = document.getElementById('gmaps-callout');
+  const bannerLink = document.getElementById('gmaps-banner-link');
+  const bannerTitle = document.getElementById('gmaps-banner-title');
+  
+  if (!q) { alert("Please enter a search item!"); return; }
+  
+  status.innerHTML = `🔍 Searching for <b>"${q}"</b> near you...`;
+  resultsDiv.innerHTML = "";
+  
+  try {
+    const res = await fetch(`/search?lat=${userLat}&lon=${userLon}&q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    
+    // Always show Google Maps Live Search card
+    banner.style.display = "flex";
+    bannerTitle.innerText = `Explore "${q}" in ${data.area || 'your area'}`;
+    bannerLink.href = data.direct_google_maps_url;
+
+    if (data.results && data.results.length > 0) {
+      status.innerHTML = `✅ Found <b>${data.results.length}</b> places in <b>${data.area || 'your area'}</b>:`;
+      data.results.forEach(place => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <span class="distance-badge">📍 ${(place.distance_m / 1000).toFixed(1)} km away</span>
+          <h3>${place.name}</h3>
+          <p>${place.address}</p>
+          <a href="${place.google_maps_url}" target="_blank" class="maps-btn">🗺️ Navigate in Google Maps</a>
+        `;
+        resultsDiv.appendChild(card);
+      });
+    } else {
+      status.innerHTML = `Found nearby area: <b>${data.area}</b>. Click below to view all live Google Maps listings!`;
+    }
+  } catch (err) {
+    status.innerText = "❌ Error: " + err.message;
+  }
+}
+</script>
+
+</body>
+</html>

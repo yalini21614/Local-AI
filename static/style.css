@@ -1,0 +1,5 @@
+body { font-family: Arial, sans-serif; margin: 2rem; }
+#form { margin-bottom: 1rem; }
+#query { width: 200px; padding: 0.4rem; }
+button { margin-left: 0.5rem; padding: 0.4rem 0.8rem; }
+pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; }
